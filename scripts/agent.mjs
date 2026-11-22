@@ -392,7 +392,7 @@ function nextStep(agent, res, checks, specDir) {
   }
   if (agent === "verifier") return checks.ui_fail > 0
     ? "Next (human): read report.md + screenshots. Decide: fix the spec (new cycle) or re-run the implementer with the report."
-    : "All checks passed. Next (human): review evidence, push the branch and open a PR (see docs/NAVODILA.md).";
+    : "All checks passed. Next (human): review evidence, push the branch and open a PR (see docs/INSTRUCTIONS.md).";
   return "Baseline done. Compare its metrics with the multi-agent runs: node scripts/agent.mjs metrics";
 }
 
