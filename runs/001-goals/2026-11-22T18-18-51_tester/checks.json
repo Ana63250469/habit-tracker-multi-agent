@@ -1,0 +1,6 @@
+{
+  "protected_tests": "locked (4 files)",
+  "tests_passed": 0,
+  "tests_failed": 31,
+  "note": "OK: all acceptance tests fail before implementation (expected)"
+}

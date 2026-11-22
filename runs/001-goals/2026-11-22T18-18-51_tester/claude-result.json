@@ -1,0 +1,117 @@
+{
+  "duration_api_ms": 62288,
+  "stop_reason": "end_turn",
+  "total_cost_usd": 0.43504279999999995,
+  "usage": {
+    "input_tokens": 14,
+    "cache_creation_input_tokens": 30276,
+    "cache_read_input_tokens": 200794,
+    "output_tokens": 7631,
+    "output_tokens_details": {
+      "thinking_tokens": 304
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 30276,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 457,
+        "cache_read_input_tokens": 41568,
+        "cache_creation_input_tokens": 1662,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1662
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "modelUsage": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 7631,
+      "cacheReadInputTokens": 200794,
+      "cacheCreationInputTokens": 30276,
+      "webSearchRequests": 0,
+      "costUSD": 0.43504279999999995,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "thinkingTokens": 304,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 30276,
+      "canonicalModel": "claude-opus-5-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "fast_mode_disabled_reason": "sdk_opt_in_required",
+  "subagent_stats": {
+    "spawned": 0,
+    "requested": {
+      "background": 0,
+      "foreground": 0,
+      "unset": 0
+    },
+    "started_in_background": 0,
+    "max_depth": 0,
+    "spawned_by_subagents": 0,
+    "completed": 0,
+    "failed": 0,
+    "killed": {
+      "parent": 0,
+      "user": 0,
+      "system": 0
+    },
+    "refused": {
+      "depth_limit": 0,
+      "concurrency_limit": 0,
+      "budget": 0
+    },
+    "by_type": {}
+  },
+  "safety_stops": 0,
+  "is_error": false,
+  "num_turns": 9,
+  "subtype": "success",
+  "api_error_status": null,
+  "result": "I wrote the acceptance tests for spec 001-goals in `app/server/tests/acceptance/001-goals.test.ts`. There are 31 tests covering AC1–AC8, including every value and boundary the spec lists.\n\nI ran `npm --prefix app/server run test:acceptance` and all 31 tests fail, as expected before implementation. They fail because `/api/goals` doesn't exist yet (it returns 404), not because of syntax, import or setup errors.\n\nThe spec had no blocking gaps, so I didn't write `questions.md`. The report in `runs/001-goals/2026-11-22T18-18-51_tester/report.md` has the criterion-to-test table, the run result and six non-blocking spec remarks. The ones that most affect the tests:\n- **Period values:** the API section doesn't say what to send, so the tests assume uppercase `\"WEEKLY\"` / `\"MONTHLY\"`, taken from the data model.\n- **401 responses:** the spec gives no error code, so those tests check only the status and `data: null`.\n- **Undefined cases:** a missing `habitId` and a PUT with an empty body aren't covered by any criterion, so they aren't tested.\n\nRESULT: TESTS_WRITTEN",
+  "ttft_ms": 1933,
+  "type": "result",
+  "duration_ms": 71826,
+  "ttft_stream_ms": 1393,
+  "time_to_request_ms": 244,
+  "first_content_frame_ms": 1394,
+  "queued_turn_count": 0,
+  "result_index": 0,
+  "model_usage_since_last_result": {
+    "claude-opus-5-5": {
+      "inputTokens": 14,
+      "outputTokens": 7631,
+      "cacheReadInputTokens": 200794,
+      "cacheCreationInputTokens": 30276,
+      "webSearchRequests": 0,
+      "costUSD": 0.43504279999999995,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "thinkingTokens": 304,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 30276,
+      "canonicalModel": "claude-opus-5-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  }
+}
