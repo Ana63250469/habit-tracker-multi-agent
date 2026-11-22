@@ -1,0 +1,5 @@
+node_modules/
+# Large raw traces stay local (summary, report and screenshots are committed as evidence)
+runs/**/transcript.jsonl
+runs/**/app.log
+runs/metrics.csv
