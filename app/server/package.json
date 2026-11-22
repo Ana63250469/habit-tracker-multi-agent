@@ -11,7 +11,9 @@
     "db:migrate": "dotenv -e ../.env -- prisma migrate dev",
     "db:deploy": "dotenv -e ../.env -- prisma migrate deploy",
     "db:studio": "dotenv -e ../.env -- prisma studio",
-    "db:generate": "dotenv -e ../.env -- prisma generate"
+    "db:generate": "dotenv -e ../.env -- prisma generate",
+    "test": "vitest run",
+    "test:acceptance": "vitest run tests/acceptance"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
@@ -28,9 +30,12 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.0.0",
+    "@types/supertest": "^6.0.3",
     "dotenv-cli": "^7.4.4",
     "prisma": "^6.0.0",
+    "supertest": "^7.1.4",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.7"
   }
 }
