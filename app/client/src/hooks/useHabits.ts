@@ -33,6 +33,7 @@ export function useDeleteHabit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.habits.all });
       qc.invalidateQueries({ queryKey: queryKeys.entries.all });
+      qc.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
   });
 }

@@ -29,3 +29,14 @@ export interface ApiError {
   data: null;
   error: { code: string; message: string };
 }
+
+export type GoalPeriod = "WEEKLY" | "MONTHLY";
+
+export interface Goal {
+  id: string;
+  habitId: string;
+  period: GoalPeriod;
+  targetCount: number;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -25,8 +25,19 @@ model Habit {
   updatedAt DateTime @updatedAt
 
   entries HabitEntry[]
+  goal    Goal?
 
   @@index([archived])
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  habitId     String   @unique
+  period      String   // "WEEKLY" | "MONTHLY"
+  targetCount Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  habit       Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
 }
 
 model HabitEntry {
