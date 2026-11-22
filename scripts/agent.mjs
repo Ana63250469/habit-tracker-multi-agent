@@ -166,7 +166,12 @@ function runClaude({ prompt, settings, mcpConfig, model, budget, runDir }) {
     if (model) args.push("--model", model);
 
     const trace = fs.createWriteStream(path.join(runDir, "transcript.jsonl"));
-    const child = spawn("claude", args, { cwd: ROOT, shell: IS_WIN, stdio: ["pipe", "pipe", "inherit"] });
+    // On Windows `claude` is a .cmd shim and needs a shell; pass one quoted command string
+    // (passing an args array together with shell:true is deprecated in Node).
+    const stdio = ["pipe", "pipe", "inherit"];
+    const child = IS_WIN
+      ? spawn(["claude", ...args.map((a) => `"${a}"`)].join(" "), { cwd: ROOT, shell: true, stdio })
+      : spawn("claude", args, { cwd: ROOT, stdio });
     child.stdin.end(prompt);
 
     let buf = "";

@@ -3,3 +3,5 @@ node_modules/
 runs/**/transcript.jsonl
 runs/**/app.log
 runs/metrics.csv
+# Playwright page snapshots (noise; screenshots and console logs are kept)
+runs/**/screenshots/page-*.yml
