@@ -1,0 +1,11 @@
+[
+  { "id": "UI1", "status": "PASS", "expected": "URL /goals; rows Run, Read with No goal; no Old", "observed": "Clicked Goals in nav; URL http://localhost:5173/goals; rows 'Run' and 'Read' each show 'No goal' with 'Set goal'; 'Old' not listed.", "screenshot": "UI1.png" },
+  { "id": "UI2", "status": "PASS", "expected": "Modal closes; 3 times per week; buttons Edit and Remove", "observed": "Modal 'Goal for Run' opened with defaults Weekly/1; set Weekly, 3, Save. Modal closed; Run row shows '3 times per week' with 'Edit' and 'Remove'.", "screenshot": "UI2.png" },
+  { "id": "UI3", "status": "PASS", "expected": "Run still shows 3 times per week", "observed": "After reloading /goals, Run shows '3 times per week'.", "screenshot": "UI3.png" },
+  { "id": "UI4", "status": "PASS", "expected": "Form pre-filled with Weekly, 3", "observed": "Edit modal shows Period=Weekly (selected), Target=3.", "screenshot": "UI4.png" },
+  { "id": "UI5", "status": "PASS", "expected": "12 times per month", "observed": "Changed to Monthly, 12, Save; modal closed; Run shows '12 times per month'.", "screenshot": "UI5.png" },
+  { "id": "UI6", "status": "PASS", "expected": "Error 'Weekly goal must be between 1 and 7'; modal stays open", "observed": "Read -> Set goal -> Weekly, 8 -> Save: alert 'Weekly goal must be between 1 and 7' shown; modal 'Goal for Read' stays open.", "screenshot": "UI6.png" },
+  { "id": "UI7", "status": "PASS", "expected": "Read still shows No goal", "observed": "Clicked Cancel; modal closed; Read shows 'No goal' with 'Set goal'.", "screenshot": "UI7.png" },
+  { "id": "UI8", "status": "PASS", "expected": "Run shows No goal", "observed": "Run -> Remove opened confirm 'Remove goal for \"Run\"?'; accepted; Run shows 'No goal' with 'Set goal'.", "screenshot": "UI8.png" },
+  { "id": "UI9", "status": "PASS", "expected": "All pages work as before; no console errors", "observed": "Today, Week, Month and Habits pages render with Run and Read (Habits also shows archived Old). Console: 0 errors, 0 warnings across the session.", "screenshot": "UI9.png" }
+]
