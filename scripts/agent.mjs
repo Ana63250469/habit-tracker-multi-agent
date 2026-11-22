@@ -303,7 +303,9 @@ async function main() {
   });
   if (stopApp) stopApp();
   if (!result) die(`Claude produced no result. See ${rel(runDir)}/transcript.jsonl`);
-  fs.writeFileSync(path.join(runDir, "claude-result.json"), JSON.stringify(result, null, 2));
+  // Drop account/session identifiers before saving: they are not needed as evidence.
+  const { session_id, uuid, credential_expires_at, ...publicResult } = result;
+  fs.writeFileSync(path.join(runDir, "claude-result.json"), JSON.stringify(publicResult, null, 2));
 
   const agentResult = (String(result.result ?? "").match(/RESULT:\s*([A-Z_]+(?: \d+)?)/) ?? [])[1]
     ?? (result.is_error ? `ERROR_${result.subtype}` : "NO_RESULT_LINE");
