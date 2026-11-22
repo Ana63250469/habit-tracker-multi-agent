@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.84",
+        "--isolated",
+        "--output-dir",
+        "runs/001-goals/2026-11-22T18-37-39_verifier/screenshots",
+        "--viewport-size",
+        "1280,800"
+      ]
+    }
+  }
+}
