@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { cn } from "../../utils/cn";
 import { useUiStore } from "../../store/uiStore";
 import { useAuthStore } from "../../store/authStore";
-import { Sun, CalendarMinus2, CalendarDays, CircleCheck, Moon, LogOut } from "lucide-react";
+import { Sun, CalendarMinus2, CalendarDays, CircleCheck, Target, Moon, LogOut } from "lucide-react";
 
 const navItems = [
   {
@@ -24,6 +24,11 @@ const navItems = [
     to: "/habits",
     label: "Habits",
     icon: <CircleCheck size={20} />,
+  },
+  {
+    to: "/goals",
+    label: "Goals",
+    icon: <Target size={20} />,
   },
 ];
 

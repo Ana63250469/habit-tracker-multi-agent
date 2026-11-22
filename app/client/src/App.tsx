@@ -8,6 +8,7 @@ import { TodayPage } from "./pages/TodayPage";
 import { WeekPage } from "./pages/WeekPage";
 import { MonthPage } from "./pages/MonthPage";
 import { HabitsPage } from "./pages/HabitsPage";
+import { GoalsPage } from "./pages/GoalsPage";
 import { useAuthStore } from "./store/authStore";
 import { useUiStore } from "./store/uiStore";
 import { getStatus } from "./api/auth";
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="week" element={<WeekPage />} />
               <Route path="month" element={<MonthPage />} />
               <Route path="habits" element={<HabitsPage />} />
+              <Route path="goals" element={<GoalsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

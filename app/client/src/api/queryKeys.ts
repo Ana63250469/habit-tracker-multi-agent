@@ -8,6 +8,9 @@ export const queryKeys = {
     today: ["entries", "today"] as const,
     range: (start: string, end: string) => ["entries", { start, end }] as const,
   },
+  goals: {
+    all: ["goals"] as const,
+  },
   auth: {
     me: ["auth", "me"] as const,
     status: ["auth", "status"] as const,

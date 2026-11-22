@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { Target } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 const navItems = [
@@ -49,6 +50,11 @@ const navItems = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
+  },
+  {
+    to: "/goals",
+    label: "Goals",
+    icon: <Target className="w-5 h-5" strokeWidth={1.8} />,
   },
 ];
 
