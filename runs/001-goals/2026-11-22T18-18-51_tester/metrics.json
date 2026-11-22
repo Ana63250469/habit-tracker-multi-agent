@@ -1,0 +1,21 @@
+{
+  "run_id": "2026-11-22T18-18-51_tester",
+  "date": "2026-11-22T18:20:13.292Z",
+  "spec": "001-goals",
+  "agent": "tester",
+  "attempt": 1,
+  "model": "claude-opus-5-5",
+  "duration_s": 72,
+  "turns": 9,
+  "input_tokens": 14,
+  "output_tokens": 7631,
+  "cache_read_tokens": 200794,
+  "cache_write_tokens": 30276,
+  "cost_usd": "0.4350",
+  "agent_result": "TESTS_WRITTEN",
+  "protected_tests": "locked (4 files)",
+  "tests_passed": 0,
+  "tests_failed": 31,
+  "note": "OK: all acceptance tests fail before implementation (expected)",
+  "total_tokens": 238715
+}
