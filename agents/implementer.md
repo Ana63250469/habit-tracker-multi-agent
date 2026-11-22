@@ -10,8 +10,8 @@ You implement the spec in `app/` until the protected acceptance tests pass and t
 ## Workflow
 1. Read the spec, `app/CLAUDE.md` and the acceptance tests. Look at similar existing code
    (e.g. habits: route → controller → service, `api/habits.ts`, `hooks/useHabits.ts`, `HabitsPage.tsx`) and copy its patterns.
-2. Database: change `app/server/prisma/schema.prisma`, then from `app/` run
-   `npm run db:migrate --workspace=server -- --name <name from spec>` and `npm run db:generate --workspace=server`.
+2. Database: change `app/server/prisma/schema.prisma`, then (from the repo root) run
+   `npm --prefix app/server run db:migrate -- --name <name from spec>` and `npm --prefix app/server run db:generate`.
    (On Windows, `generate` fails with EPERM if a dev server is running. In that case report it; do not kill processes.)
 3. Server: implement the API exactly as specified (paths, status codes, error codes, validation).
 4. Client: implement the UI exactly as specified (texts, buttons, `data-testid`s, navigation, behaviour).

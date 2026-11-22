@@ -18,6 +18,8 @@ Agents implement features in an existing app from a spec. A human reviews the ev
 
 - The spec is the source of truth. If it is unclear, report a question; do not guess.
 - Stay inside the files your role allows (see your instructions).
+- Run every command from the repo root and never `cd` elsewhere: file permissions are relative to the repo root.
+  Use `npm --prefix app/server ...` or `npm --prefix app ...` instead of `cd`.
 - Never edit `specs/`, `agents/`, `scripts/`, `app/server/tests/support/` or `.env`.
 - Do not commit, push or switch branches. The runner commits after the human-visible checks.
 - End your final message with one line `RESULT: <STATUS>` as defined in your instructions.
