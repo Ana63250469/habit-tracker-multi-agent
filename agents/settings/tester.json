@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(./app/server/tests/acceptance/**)",
+      "Edit(./runs/**)",
+      "Bash(npm --prefix app/server run test*)",
+      "Bash(npm --prefix app/server test*)",
+      "Bash(ls*)"
+    ],
+    "deny": [
+      "WebFetch",
+      "WebSearch",
+      "Bash(git push*)",
+      "Bash(git commit*)",
+      "Bash(git checkout*)",
+      "Bash(git reset*)",
+      "Bash(rm *)"
+    ]
+  }
+}

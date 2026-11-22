@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["mcp__playwright", "Edit(./runs/**)"],
+    "deny": ["Bash", "WebFetch", "WebSearch", "Read(./app/**)", "Edit(./app/**)"]
+  }
+}

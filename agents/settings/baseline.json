@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(./app/**)",
+      "Edit(./runs/**)",
+      "Bash(npm run *)",
+      "Bash(npm --prefix app *)",
+      "Bash(npm --prefix app/server *)",
+      "Bash(npm --prefix app/client *)",
+      "Bash(npx prisma *)",
+      "Bash(npx tsc*)",
+      "Bash(npx vitest*)",
+      "Bash(cd *)",
+      "Bash(ls*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)"
+    ],
+    "deny": [
+      "Edit(./app/server/prisma/migrations/**)",
+      "Edit(./app/.env)",
+      "Edit(./app/Dockerfile)",
+      "Edit(./app/docker-compose.yml)",
+      "WebFetch",
+      "WebSearch",
+      "Bash(npm install*)",
+      "Bash(npm i *)",
+      "Bash(npm publish*)",
+      "Bash(git push*)",
+      "Bash(git commit*)",
+      "Bash(git checkout*)",
+      "Bash(git reset*)",
+      "Bash(git stash*)",
+      "Bash(rm -rf*)"
+    ]
+  }
+}
