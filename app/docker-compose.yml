@@ -1,26 +1,16 @@
-networks:
-  # The "frontend" network allows this container to communicate with Nginx Proxy Manager
-  # by container name. Create it first with: docker network create frontend
-  # If you are not using NPM, remove this section and uncomment the ports below.
-  frontend:
-    external: true
-
 services:
   habit-tracker:
     build: .
     container_name: habit-tracker
     restart: unless-stopped
     init: true
-    networks:
-      - frontend
-    # If not using a reverse proxy, uncomment the following and remove the networks section above:
-    #ports:
-    #  - "3000:3000"
+    ports:
+      - "3000:3000"
     volumes:
       - habit-data:/data
     environment:
       DATABASE_URL: file:/data/habits.db
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_SECRET: ${JWT_SECRET:-aa}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
       NODE_ENV: production
       # Optional: skip the first-run setup wizard by pre-defining credentials
@@ -35,6 +25,3 @@ services:
 volumes:
   habit-data:
     name: habit-tracker_habit-data
-    external: true
-
-# NPM is managed separately. See the README for proxy host configuration.
