@@ -74,10 +74,87 @@ function checksum(dirs) {
 }
 
 function runVitest(target, outFile) {
-  const r = sh(`npx vitest run ${target} --reporter=json --outputFile="${outFile}"`, { cwd: SERVER });
-  if (!fs.existsSync(outFile)) return { passed: 0, failed: 0, total: 0, error: r.out.slice(-2000) };
-  const j = JSON.parse(fs.readFileSync(outFile, "utf8"));
-  return { passed: j.numPassedTests, failed: j.numFailedTests, total: j.numTotalTests };
+  fs.rmSync(outFile, { force: true });
+
+  const r = sh(
+    `npx vitest run ${target} --reporter=json --outputFile="${outFile}"`,
+    { cwd: SERVER }
+  );
+
+  const broken = message => ({
+    passed: 0,
+    failed: 0,
+    total: 0,
+    skipped: 0,
+    valid: false,
+    ok: false,
+    error: message
+  });
+
+  if (!fs.existsSync(outFile)) {
+    return broken("Vitest did not produce a test report.");
+  }
+
+  try {
+    const j = JSON.parse(fs.readFileSync(outFile, "utf8"));
+
+    const counts = [
+      j.numPassedTests,
+      j.numFailedTests,
+      j.numTotalTests,
+      j.numPendingTests,
+      j.numTodoTests
+    ];
+
+    if (!counts.every(n => Number.isInteger(n) && n >= 0)) {
+      return broken("Vitest report has invalid test counts.");
+    }
+
+    const passed = j.numPassedTests;
+    const failed = j.numFailedTests;
+    const total = j.numTotalTests;
+    const skipped = j.numPendingTests + j.numTodoTests;
+
+    if (total === 0) {
+      return broken("No tests ran.");
+    }
+
+    if (passed + failed + skipped !== total) {
+      return broken("Vitest report has inconsistent test counts.");
+    }
+
+    if (
+      !Array.isArray(j.testResults) ||
+      j.testResults.length === 0 ||
+      (j.numRuntimeErrorTestSuites ?? 0) > 0 ||
+      j.testResults.some(suite =>
+        !suite ||
+        !Array.isArray(suite.assertionResults) ||
+        (
+          suite.status === "failed" &&
+          !suite.assertionResults.some(test => test.status === "failed")
+        )
+      )
+    ) {
+      return broken("A test suite could not run correctly.");
+    }
+
+    if (!r.ok && failed === 0) {
+      return broken("Vitest exited unsuccessfully.");
+    }
+
+    return {
+      passed,
+      failed,
+      total,
+      skipped,
+      valid: true,
+      ok: r.ok && j.success === true &&
+        failed === 0 && skipped === 0
+    };
+  } catch {
+    return broken("Vitest report could not be read or parsed.");
+  }
 }
 
 function currentBranch() {
@@ -312,15 +389,32 @@ async function main() {
 
   // --- deterministic checks (the code decides, not the agent) ---
   log("\n• Running checks…");
-  const checks = {};
+  const checks = {
+    agent_execution: result.is_error ? "FAILED" : "ok"
+  };
   if (agent === "tester" && agentResult === "TESTS_WRITTEN") {
     const sum = checksum(PROTECTED_DIRS);
     fs.writeFileSync(sumFile, sum.hash + "\n");
     checks.protected_tests = `locked (${sum.count} files)`;
     const t = runVitest("tests/acceptance", path.join(runDir, "tests.json"));
-    Object.assign(checks, { tests_passed: t.passed, tests_failed: t.failed });
-    checks.note = t.total === 0 ? "⚠ no tests found" : t.passed > 0 ? "⚠ some tests already pass before implementation; review them"
-      : "OK: all acceptance tests fail before implementation (expected)";
+    Object.assign(checks, {
+      tests_passed: t.passed,
+      tests_failed: t.failed,
+      tests_skipped: t.skipped,
+      test_execution: t.valid ? "ok" : "FAILED",
+      tests: t.ok ? "ok" : "FAILED"
+    });
+
+    if (t.error) {
+      checks.test_error = t.error;
+    }
+    checks.note = !t.valid
+      ? `Test execution failed: ${t.error}`
+      : t.skipped > 0
+        ? "Some tests were skipped; review them."
+        : t.passed > 0
+          ? "Some tests already pass before implementation; review them."
+          : "All acceptance tests failed before implementation; review that they failed because the feature is missing.";
   }
   if (agent === "implementer" || agent === "baseline") {
     if (agent === "baseline" && args.testsFrom) {
@@ -333,20 +427,32 @@ async function main() {
     }
     sh("npx prisma generate", { cwd: SERVER });
     const t = runVitest("", path.join(runDir, "tests.json"));
-    Object.assign(checks, { tests_passed: t.passed, tests_failed: t.failed });
+    Object.assign(checks, {
+      tests_passed: t.passed,
+      tests_failed: t.failed,
+      tests_skipped: t.skipped,
+      test_execution: t.valid ? "ok" : "FAILED",
+      tests: t.ok ? "ok" : "FAILED"
+    });
+
+    if (t.error) {
+      checks.test_error = t.error;
+    }
     const b = sh("npm run build", { cwd: APP });
     fs.writeFileSync(path.join(runDir, "build.log"), b.out);
     checks.build = b.ok ? "ok" : "FAILED";
   }
+
   if (agent === "verifier") {
-    const f = path.join(runDir, "verification.json");
-    if (fs.existsSync(f)) {
-      try {
-        const v = JSON.parse(fs.readFileSync(f, "utf8"));
-        checks.ui_pass = v.filter((s) => s.status === "PASS").length;
-        checks.ui_fail = v.filter((s) => s.status !== "PASS").length;
-      } catch { checks.note = "⚠ verification.json is not valid JSON"; }
-    } else checks.note = "⚠ verifier did not write verification.json";
+    Object.assign(
+      checks,
+      checkVerification(
+        runDir,
+        path.join(ROOT, specFile),
+        agentResult,
+        result.is_error
+      )
+    );
   }
   fs.writeFileSync(path.join(runDir, "checks.json"), JSON.stringify(checks, null, 2));
 
@@ -367,14 +473,66 @@ async function main() {
 
   // --- commit (evidence + changes) ---
   const rejected = checks.protected_tests?.startsWith("CHANGED");
+
+  let runStatus = "FAILED";
+
+  if (checks.agent_execution !== "ok" || rejected) {
+    runStatus = "FAILED";
+  } else if (
+    agentResult === "BLOCKED" ||
+    agentResult === "SPEC_QUESTIONS"
+  ) {
+    runStatus = "BLOCKED";
+  } else if (agent === "tester") {
+    if (
+      agentResult === "TESTS_WRITTEN" &&
+      checks.test_execution === "ok" &&
+      checks.tests_skipped === 0
+    ) {
+      runStatus = "PASSED";
+    }
+  } else if (agent === "implementer") {
+    if (
+      agentResult === "IMPLEMENTED" &&
+      checks.protected_tests === "unchanged" &&
+      checks.test_execution === "ok" &&
+      checks.tests === "ok" &&
+      checks.build === "ok"
+    ) {
+      runStatus = "PASSED";
+    }
+  } else if (agent === "verifier") {
+    if (checks.verification === "ok") {
+      runStatus = "PASSED";
+    }
+  } else {
+    // Other roles have no complete outcome policy defined here.
+    runStatus = "RECORDED";
+  }
+
+  log(`• Run status: ${runStatus}`);
+
   if (args.commit && branch !== "main" && !rejected) {
-    sh("git add -A app runs");
-    const c = sh(`git commit -q -m "${agent}(${group}): ${agentResult} [run ${runId}]"`);
-    log(c.ok ? "• Committed." : "• Nothing to commit.");
+    const staged = sh("git add -A app runs");
+
+    if (!staged.ok) {
+      log(`• Could not stage changes:\n${staged.out}`);
+    } else {
+      const c = sh(
+        `git commit -q -m "${agent}(${group}): ${runStatus} - ${agentResult} [run ${runId}]"`
+      );
+
+      log(
+        c.ok
+          ? `• Committed (${runStatus}).`
+          : `• Commit not created. Check Git output:\n${c.out}`
+      );
+    }
+  } else if (args.commit && rejected) {
+    log("• Not committed: protected tests were changed.");
   } else if (args.commit && branch === "main") {
     log("• On main: run evidence left uncommitted.");
   }
-
   // --- summary for the human ---
   log("\n──────── SUMMARY ────────");
   log(`Agent result : ${agentResult}`);
@@ -386,20 +544,196 @@ async function main() {
   log(nextStep(agent, agentResult, checks, specDir));
 }
 
+function checkVerification(
+  runDir,
+  specFile,
+  agentResult,
+  agentError = false
+) {
+  const checks = {
+    ui_pass: 0,
+    ui_fail: 0,
+    verification: "FAILED"
+  };
+
+  try {
+    const spec = fs.readFileSync(specFile, "utf8");
+
+    const expected = [
+      ...spec.matchAll(/^\s*\|\s*(UI\d+)\s*\|/gm)
+    ].map(m => m[1]);
+
+    if (
+      !expected.length ||
+      new Set(expected).size !== expected.length
+    ) {
+      throw new Error(
+        "Spec must list unique UI scenario IDs in its scenarios table."
+      );
+    }
+
+    const file = path.join(runDir, "verification.json");
+
+    if (!fs.existsSync(file)) {
+      throw new Error("verification.json is missing.");
+    }
+
+    const results = JSON.parse(fs.readFileSync(file, "utf8"));
+
+    if (!Array.isArray(results)) {
+      throw new Error(
+        "verification.json must contain an array."
+      );
+    }
+
+    const seen = new Set();
+
+    for (const scenario of results) {
+      if (
+        !scenario ||
+        typeof scenario !== "object" ||
+        !expected.includes(scenario.id)
+      ) {
+        throw new Error(
+          "Unexpected or missing UI scenario ID."
+        );
+      }
+
+      if (seen.has(scenario.id)) {
+        throw new Error(
+          `Duplicate scenario: ${scenario.id}.`
+        );
+      }
+
+      seen.add(scenario.id);
+
+      if (!["PASS", "FAIL"].includes(scenario.status)) {
+        throw new Error(
+          `Invalid status for ${scenario.id}.`
+        );
+      }
+
+      if (
+        typeof scenario.screenshot !== "string" ||
+        !/\.png$/i.test(scenario.screenshot)
+      ) {
+        throw new Error(
+          `Missing screenshot reference for ${scenario.id}.`
+        );
+      }
+
+      // Supports "UI1.png" or "screenshots/UI1.png".
+      const name = scenario.screenshot;
+      const root = fs.realpathSync(runDir);
+
+      const candidates = [
+        path.resolve(runDir, name),
+        path.resolve(runDir, "screenshots", name)
+      ];
+
+      const exists = candidates.some(candidate => {
+        try {
+          const actual = fs.realpathSync(candidate);
+          const relative = path.relative(root, actual);
+
+          return (
+            relative !== "" &&
+            relative !== ".." &&
+            !relative.startsWith(`..${path.sep}`) &&
+            !path.isAbsolute(relative) &&
+            fs.statSync(actual).isFile() &&
+            fs.statSync(actual).size > 0
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      if (!exists) {
+        throw new Error(
+          `Screenshot missing, empty or outside the run folder: ${scenario.id}.`
+        );
+      }
+
+      if (scenario.status === "PASS") {
+        checks.ui_pass++;
+      } else {
+        checks.ui_fail++;
+      }
+    }
+
+    const missing = expected.filter(id => !seen.has(id));
+
+    if (missing.length) {
+      throw new Error(
+        `Missing scenarios: ${missing.join(", ")}.`
+      );
+    }
+
+    if (checks.ui_fail > 0) {
+      throw new Error(
+        `${checks.ui_fail} UI scenario(s) failed.`
+      );
+    }
+
+    if (agentError || agentResult !== "ALL_PASS") {
+      throw new Error(
+        "Verifier did not finish successfully with RESULT: ALL_PASS."
+      );
+    }
+
+    checks.verification = "ok";
+  } catch (error) {
+    checks.note =
+      `Verification failed or incomplete: ${error.message}`;
+  }
+
+  return checks;
+}
+
 function nextStep(agent, res, checks, specDir) {
   const s = specDir === "specs/001-goals" ? "" : ` --spec ${specDir}`;
   if (agent === "explore") return "Next: read the report and screenshots. Then: git checkout -b feature/spec-001-goals && node scripts/agent.mjs tester";
-  if (agent === "tester") return res === "SPEC_QUESTIONS"
-    ? "Next (human): answer questions.md by improving the spec, then re-run the tester."
-    : `Next (human): skim the tests and report. If OK: node scripts/agent.mjs implementer${s}`;
+  if (agent === "tester") {
+    if (checks.agent_execution !== "ok") {
+      return "Tester execution failed. Read the run outputs before continuing.";
+    }
+
+    if (res === "SPEC_QUESTIONS") {
+      return "Next (human): answer questions.md by improving the spec, then re-run the tester.";
+    }
+
+    if (
+      res !== "TESTS_WRITTEN" ||
+      checks.test_execution !== "ok" ||
+      checks.tests_skipped !== 0
+    ) {
+      return "Tester work is incomplete or testing could not complete. Read checks.json and report.md before continuing.";
+    }
+
+    return `Next (human): review the tests and report. If OK: node scripts/agent.mjs implementer${s}`;
+  }
   if (agent === "implementer") {
+    if (
+      checks.agent_execution !== "ok" ||
+      res !== "IMPLEMENTED"
+    ) {
+      return "Implementation failed, is blocked or is incomplete. Read the run outputs before continuing.";
+    }
     if (checks.protected_tests?.startsWith("CHANGED")) return "Run rejected: protected tests were modified. Restore them (git checkout -- app/server/tests) and re-run.";
-    if (checks.tests_failed > 0 || checks.build !== "ok") return `Next (human): read report.md. Re-run the implementer, or fix the spec if it is unclear.`;
+    if (
+      checks.test_execution !== "ok" ||
+      checks.tests !== "ok" ||
+      checks.build !== "ok"
+    ) {
+      return "Next (human): read checks.json and report.md. Tests or build failed or could not complete. Resolve the problem before continuing.";
+    }
     return `Next: node scripts/agent.mjs verifier${s}`;
   }
-  if (agent === "verifier") return checks.ui_fail > 0
-    ? "Next (human): read report.md + screenshots. Decide: fix the spec (new cycle) or re-run the implementer with the report."
-    : "All checks passed. Next (human): review evidence, push the branch and open a PR (see docs/INSTRUCTIONS.md).";
+  if (agent === "verifier") {
+    return checks.verification !== "ok"
+      ? "Verification failed or incomplete. Next (human): read checks.json, report.md and screenshots before continuing."
+      : "All checks passed. Next (human): review evidence, push the branch and open a PR (see docs/INSTRUCTIONS.md).";}
   return "Baseline done. Compare its metrics with the multi-agent runs: node scripts/agent.mjs metrics";
 }
 
