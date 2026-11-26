@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import * as goalsService from "../services/goals.service";
+import * as progressService from "../services/progress.service";
+import { isValidProgressDate } from "../lib/calendar";
 
 const period = z.enum(["WEEKLY", "MONTHLY"]);
 const targetCount = z.number({ required_error: "Enter a whole number" }).int("Enter a whole number");
@@ -32,6 +34,29 @@ function handleError(err: unknown, res: Response, next: NextFunction) {
     return;
   }
   next(err);
+}
+
+const progressQuerySchema = z.object({
+  // `date` must be a single valid calendar date string in YYYY-MM-DD format;
+  // repeated params (arrays) and non-string values are rejected.
+  date: z.unknown().refine(isValidProgressDate, { message: progressService.PROGRESS_DATE_ERROR }),
+});
+
+export async function progress(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { date } = progressQuerySchema.parse(req.query);
+    const items = await progressService.getGoalProgress(date);
+    res.json({ data: items, error: null });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({
+        data: null,
+        error: { code: "VALIDATION_ERROR", message: progressService.PROGRESS_DATE_ERROR },
+      });
+      return;
+    }
+    next(err);
+  }
 }
 
 export async function list(_req: Request, res: Response, next: NextFunction) {

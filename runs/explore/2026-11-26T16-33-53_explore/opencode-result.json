@@ -1,0 +1,16 @@
+{
+  "result": "",
+  "is_error": true,
+  "error": "OpenCode produced no final response.",
+  "subtype": "OPENCODE",
+  "duration_ms": 58719,
+  "num_turns": 21,
+  "usage": {
+    "input_tokens": 25285,
+    "output_tokens": 678,
+    "cache_read_input_tokens": 381440,
+    "cache_creation_input_tokens": 0
+  },
+  "reasoning_tokens": 1672,
+  "total_cost_usd": 0
+}

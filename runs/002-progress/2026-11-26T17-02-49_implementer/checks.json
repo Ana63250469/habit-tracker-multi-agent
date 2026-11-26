@@ -1,0 +1,10 @@
+{
+  "agent_execution": "ok",
+  "protected_tests": "unchanged",
+  "tests_passed": 130,
+  "tests_failed": 0,
+  "tests_skipped": 0,
+  "test_execution": "ok",
+  "tests": "ok",
+  "build": "ok"
+}

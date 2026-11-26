@@ -22,7 +22,10 @@ export function useUpdateHabit() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof habitsApi.updateHabit>[1] }) =>
       habitsApi.updateHabit(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.habits.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.habits.all });
+      qc.invalidateQueries({ queryKey: queryKeys.goalProgress.all });
+    },
   });
 }
 
@@ -34,6 +37,7 @@ export function useDeleteHabit() {
       qc.invalidateQueries({ queryKey: queryKeys.habits.all });
       qc.invalidateQueries({ queryKey: queryKeys.entries.all });
       qc.invalidateQueries({ queryKey: queryKeys.goals.all });
+      qc.invalidateQueries({ queryKey: queryKeys.goalProgress.all });
     },
   });
 }
@@ -42,6 +46,9 @@ export function useReorderHabits() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: habitsApi.reorderHabits,
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.habits.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.habits.all });
+      qc.invalidateQueries({ queryKey: queryKeys.goalProgress.all });
+    },
   });
 }

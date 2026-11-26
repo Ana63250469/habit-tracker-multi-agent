@@ -1,0 +1,14 @@
+{
+  "result": "Everything is in place. Final summary:\n\n**Step 1 — Spec review:** No blocking gaps in SPEC-002. All API acceptance criteria (AC1–AC10) have precise expected results; error contract (`400 VALIDATION_ERROR` + `Enter a valid date in YYYY-MM-DD format`, `401` existing auth), period rules (Mon–Sun weekly, full-month monthly, `HabitEntry.date`, calendar dates, no TZ shift), arithmetic (`remainingCount=max(t-completed,0)`, `achieved=completed>=target`, `percentage=min(100,floor(completed/target*100))`), and ordering (`sortOrder`, `createdAt`, `id`; exclude archived/no-goal; empty array; no mutation) are unambiguous. Non-blocking remarks recorded.\n\n**Step 2 — Tests:** Created single black-box file `app/server/tests/acceptance/002-progress.test.ts` — **62 tests**, Vitest + Supertest via `api()`, `resetDb()` in `beforeEach`, setup through existing HTTP APIs, **fixed dates** (`2026-11-24`, never current date), asserting **status code + relevant `data`/`error.code` fields**, every name prefixed with criterion (`AC1`…`AC10`), independent tests. **Every API acceptance criterion covered**, including all listed values/boundaries: AC4 `2026-11-23`–`2026-11-29` boundaries + Nov 22/30 exclusions + Nov 29-after-reference; AC5 Nov 1/30, Oct 31/Dec 1, Feb 2028 leap `2028-02-29`, `2027-01-01`→`2026-12-28`–`2027-01-03`; AC9 missing/empty/`24-11-2026`/`2026-02-30`/`2026-13-01`/repeated→400, `2028-02-29`→200 + extra §5 cases; AC10 no-token/invalid-token→401 incl. auth-before-validation. No SPEC-001 test modified; nothing outside `app/server/tests/acceptance/` + run dir changed.\n\n**Step 3 — Run:** `npm --prefix app/server run test:acceptance` → no syntax/import errors; **58 new tests fail because `GET /api/goals/progress` returns 404 (missing feature)**; **4 AC10 auth tests already pass** (SPEC-002 §6 explicitly permits already-working auth; nothing weakened). **SPEC-001 regression: 31/31 passed**; full `npm --prefix app/server test` → 95 total, only my 58 new fail. (Fixed my own test-helper bug constructing doubled `/progress` paths before finalizing.)\n\n**Step 4 — Report:** `runs/002-progress/2026-11-26T16-38-42_tester/report.md` — criterion→test-names table, counts + run result, **existing vs new results separately**, **Spec remarks** (notably §5 `0001`–`9999` containing-week rule not mapped to an AC; `id` tie-break not black-box testable; `PUT /api/entries/:id` requires `time`; `PUT /api/goals/:id` combined period+target re-validation; `POST /api/entries` only shape-checks `date`).\n\nRESULT: TESTS_WRITTEN",
+  "is_error": false,
+  "duration_ms": 1207308,
+  "num_turns": 40,
+  "usage": {
+    "input_tokens": 197360,
+    "output_tokens": 22507,
+    "cache_read_input_tokens": 4770816,
+    "cache_creation_input_tokens": 0
+  },
+  "reasoning_tokens": 47298,
+  "total_cost_usd": 0
+}

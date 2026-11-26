@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { Goal, GoalPeriod } from "../types";
+import type { Goal, GoalPeriod, GoalProgress } from "../types";
 
 export async function listGoals(): Promise<Goal[]> {
   const res = await apiClient.get<{ data: Goal[] }>("/goals");
@@ -18,4 +18,9 @@ export async function updateGoal(id: string, data: { period?: GoalPeriod; target
 
 export async function deleteGoal(id: string): Promise<void> {
   await apiClient.delete(`/goals/${id}`);
+}
+
+export async function getGoalProgress(date: string): Promise<GoalProgress[]> {
+  const res = await apiClient.get<{ data: GoalProgress[] }>("/goals/progress", { params: { date } });
+  return res.data.data;
 }

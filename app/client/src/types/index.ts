@@ -40,3 +40,16 @@ export interface Goal {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface GoalProgress {
+  goalId: string;
+  habitId: string;
+  period: GoalPeriod;
+  targetCount: number;
+  periodStart: string;
+  periodEnd: string;
+  completedCount: number;
+  remainingCount: number;
+  percentage: number;
+  achieved: boolean;
+}

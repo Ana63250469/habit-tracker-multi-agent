@@ -9,11 +9,27 @@ export function useGoals() {
   });
 }
 
+function invalidateGoalsAndProgress(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: queryKeys.goals.all });
+  // Refresh progress after successfully creating, updating, or removing a goal.
+  qc.invalidateQueries({ queryKey: queryKeys.goalProgress.all });
+}
+
+export function useGoalProgress(date: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.goalProgress.forDate(date),
+    queryFn: () => goalsApi.getGoalProgress(date),
+    enabled,
+    staleTime: 0,
+    retry: false,
+  });
+}
+
 export function useCreateGoal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: goalsApi.createGoal,
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.goals.all }),
+    onSuccess: () => invalidateGoalsAndProgress(qc),
   });
 }
 
@@ -22,7 +38,7 @@ export function useUpdateGoal() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof goalsApi.updateGoal>[1] }) =>
       goalsApi.updateGoal(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.goals.all }),
+    onSuccess: () => invalidateGoalsAndProgress(qc),
   });
 }
 
@@ -30,6 +46,6 @@ export function useDeleteGoal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: goalsApi.deleteGoal,
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.goals.all }),
+    onSuccess: () => invalidateGoalsAndProgress(qc),
   });
 }

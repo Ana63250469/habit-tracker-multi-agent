@@ -17,13 +17,17 @@ export function useEntries(startDate: string, endDate: string) {
   });
 }
 
+// Entry changes affect goal progress; invalidate progress queries too.
+function invalidateEntriesAndProgress(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: queryKeys.entries.all });
+  qc.invalidateQueries({ queryKey: queryKeys.goalProgress.all });
+}
+
 export function useCreateEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: entriesApi.createEntry,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.entries.all });
-    },
+    onSuccess: () => invalidateEntriesAndProgress(qc),
   });
 }
 
@@ -32,9 +36,7 @@ export function useUpdateEntry() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof entriesApi.updateEntry>[1] }) =>
       entriesApi.updateEntry(id, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.entries.all });
-    },
+    onSuccess: () => invalidateEntriesAndProgress(qc),
   });
 }
 
@@ -42,8 +44,6 @@ export function useDeleteEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: entriesApi.deleteEntry,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.entries.all });
-    },
+    onSuccess: () => invalidateEntriesAndProgress(qc),
   });
 }

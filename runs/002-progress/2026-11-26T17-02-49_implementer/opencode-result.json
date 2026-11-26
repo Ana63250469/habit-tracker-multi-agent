@@ -1,0 +1,14 @@
+{
+  "result": "Everything is green. Final verification is complete.\n\n**Summary of implementation:**\n\nServer (routes → controllers → services, Zod, no schema/migration changes):\n- `app/server/src/lib/calendar.ts` (new): pure proleptic-Gregorian calendar math, strict `YYYY-MM-DD` parsing (years 0001–9999, no impossible dates, no time zones), Monday–Sunday weekly / first–last-day monthly periods, and `isValidProgressDate` including complete-containing-period boundary checks.\n- `app/server/src/services/progress.service.ts` (new): read-only `GET` computation `completedCount` / `remainingCount` / `percentage` / `achieved`, counting every `HabitEntry` in-period by calendar `date`, one item per goal of an active habit, ordered by habit `sortOrder`, `createdAt`, `id`.\n- `app/server/src/controllers/goals.controller.ts`, `app/server/src/routes/goals.routes.ts`: `GET /api/goals/progress` registered first after `requireAuth`; 400 `VALIDATION_ERROR` \"Enter a valid date in YYYY-MM-DD format\"; `{ data, error }`.\n\nClient (API → TanStack Query → page):\n- `app/client/src/utils/progressDate.ts` (new), `api/goals.ts`, `api/queryKeys.ts`, `hooks/useGoals.ts`, `hooks/useEntries.ts`, `hooks/useHabits.ts`, `pages/GoalsPage.tsx`, `types`.\n- `Progress date` input (today local, resets on load, invalid → `Enter a valid date in YYYY-MM-DD format`, no request, hide progress); per-habit `{n} of {t} completed this week|month`, `{periodStart} – {periodEnd}`, `Goal reached`, `role=\"progressbar\"` `Progress for {name}` 0–100 `aria-valuenow=percentage`; `Loading progress...` / `Could not load progress.` + `Retry`; `No goal` + SPEC-001 controls preserved; separate `goalProgress` query family keyed by reference date; progress invalidated on goal create/update/remove, entry create/update/delete, habit changes; all required `data-testid`s. (No Playwright tooling here, so UI1–UI10 weren't executed; server + build verified.)\n\n**Results:**\n- `npm --prefix app/server test` → **130 passed** (protected SPEC-001 31/31, SPEC-002 62/62, harness 2/2 + my 35 unit tests; acceptance `test:acceptance` 93/93).\n- `npm --prefix app run build` → **success**.\n- No protected test/support files, schema, migrations, auth, Docker, `.env`, `specs/`, `agents/`, `scripts/` touched; no new dependencies.\n- Report: `runs/002-progress/2026-11-26T17-02-49_implementer/report.md`.\n\nRESULT: IMPLEMENTED",
+  "is_error": false,
+  "duration_ms": 2159025,
+  "num_turns": 74,
+  "usage": {
+    "input_tokens": 166554,
+    "output_tokens": 21588,
+    "cache_read_input_tokens": 10733568,
+    "cache_creation_input_tokens": 0
+  },
+  "reasoning_tokens": 46458,
+  "total_cost_usd": 0
+}

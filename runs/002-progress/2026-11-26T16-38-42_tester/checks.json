@@ -1,0 +1,10 @@
+{
+  "agent_execution": "ok",
+  "protected_tests": "locked (5 files)",
+  "tests_passed": 35,
+  "tests_failed": 58,
+  "tests_skipped": 0,
+  "test_execution": "ok",
+  "tests": "FAILED",
+  "note": "Some tests already pass before implementation; review them."
+}

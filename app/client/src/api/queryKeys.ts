@@ -11,6 +11,10 @@ export const queryKeys = {
   goals: {
     all: ["goals"] as const,
   },
+  goalProgress: {
+    all: ["goal-progress"] as const,
+    forDate: (date: string) => ["goal-progress", date] as const,
+  },
   auth: {
     me: ["auth", "me"] as const,
     status: ["auth", "status"] as const,
