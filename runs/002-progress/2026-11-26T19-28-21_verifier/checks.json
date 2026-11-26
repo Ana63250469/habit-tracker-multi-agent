@@ -1,0 +1,7 @@
+{
+  "agent_execution": "FAILED",
+  "ui_pass": 0,
+  "ui_fail": 0,
+  "verification": "FAILED",
+  "note": "Verification failed or incomplete: verification.json is missing."
+}
