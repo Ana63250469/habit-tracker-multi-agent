@@ -6,22 +6,22 @@
 //
 // Options:
 //   --spec <dir>          spec folder (default: specs/001-goals)
-//   --model <name>        Claude model alias or id (default: Claude Code default)
-//   --budget <usd>        max spend for this run (default: 5)
+//   --runner <name>       claude (default) or opencode (OpenCode v2)
+//   --model <name>        model for the selected runner (defaults to its configured model)
+//   --budget <usd>        Claude Code only: max spend for this run (default: 5)
 //   --no-commit           do not commit the result
 //   --tests-from <branch> (baseline only) bring acceptance tests from this branch and run them
 //   --feedback <file>     (implementer) add e.g. a verifier report to the prompt for the next cycle
-//   --dry-run             prepare everything (and start/stop the app for browser agents) but do not call Claude
+//   --dry-run             prepare everything (and start/stop the app for browser agents) without calling a model
 //
-// What it does: builds the prompt (agents/<name>.md + run context), runs `claude -p` headless with the
-
-// (tests, build, checksum of protected tests), appends a row to runs/metrics.csv and commits.
+// Builds the prompt, runs one agent, then checks and records the result.
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { openCodeConfig, runOpenCode } from "./opencode.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const APP = path.join(ROOT, "app");
@@ -34,6 +34,7 @@ const METRIC_COLUMNS = [
   "run_id", "date", "spec", "agent", "attempt", "model", "duration_s", "turns",
   "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "total_tokens",
   "cost_usd", "agent_result", "tests_passed", "tests_failed", "build", "protected_tests", "ui_pass", "ui_fail",
+  "runner",
 ];
 
 // ---------- small helpers ----------
@@ -47,13 +48,15 @@ function sh(cmd, opts = {}) {
 }
 
 function parseArgs(argv) {
-  const args = { _: [], spec: "specs/001-goals", budget: "5", commit: true };
+  const args = { _: [], spec: "specs/001-goals", runner: "claude", commit: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--no-commit") args.commit = false;
     else if (a === "--dry-run") args.dryRun = true;
-    else if (a.startsWith("--")) args[a.slice(2).replace(/-(\w)/g, (_, c) => c.toUpperCase())] = argv[++i];
-    else args._.push(a);
+    else if (a.startsWith("--")) {
+      if (!argv[i + 1] || argv[i + 1].startsWith("--")) die(`${a} requires a value.`);
+      args[a.slice(2).replace(/-(\w)/g, (_, c) => c.toUpperCase())] = argv[++i];
+    } else args._.push(a);
   }
   return args;
 }
@@ -168,6 +171,19 @@ function csvRow(obj) {
   }).join(",");
 }
 
+function appendMetrics(row) {
+  const header = METRIC_COLUMNS.join(",");
+  const oldHeader = METRIC_COLUMNS.slice(0, -1).join(",");
+  if (!fs.existsSync(METRICS)) fs.writeFileSync(METRICS, `${header}\n`);
+  else {
+    const csv = fs.readFileSync(METRICS, "utf8");
+    if (csv.split(/\r?\n/, 1)[0] === oldHeader) {
+      fs.writeFileSync(METRICS, header + csv.slice(oldHeader.length));
+    }
+  }
+  fs.appendFileSync(METRICS, `${csvRow(row)}\n`);
+}
+
 // Metrics come from two sources, merged by run_id:
 // - runs/metrics.csv: local, git-ignored, survives branch switches (feature vs. baseline);
 // - runs/**/metrics.json: committed with each run, so teammates see the runs of the current branch.
@@ -215,7 +231,9 @@ async function startApp(runDir) {
   log("• Starting app (npm run dev)…");
   const out = fs.openSync(path.join(runDir, "app.log"), "w");
   const child = spawn("npm run dev", { cwd: APP, env, shell: true, stdio: ["ignore", out, out], detached: !IS_WIN });
+  fs.closeSync(out);
   const stop = () => {
+    process.off("exit", stop);
     if (IS_WIN) spawnSync(`taskkill /pid ${child.pid} /T /F`, { shell: true, stdio: "ignore" });
     else try { process.kill(-child.pid, "SIGTERM"); } catch {}
   };
@@ -288,19 +306,23 @@ function printMetrics() {
   const rows = readMetrics();
   if (!rows.length) return log("No runs yet (runs/metrics.csv is empty).");
   console.table(rows.map((r) => ({
-    run: r.run_id, agent: r.agent, try: r.attempt, min: (r.duration_s / 60).toFixed(1), turns: r.turns,
-    tokens: r.total_tokens, usd: r.cost_usd, result: r.agent_result,
+    run: r.run_id, agent: r.agent, runner: r.runner || "claude", try: r.attempt,
+    min: (r.duration_s / 60).toFixed(1), turns: r.turns || "n/a",
+    tokens: r.total_tokens || "n/a", usd: r.cost_usd || "n/a", result: r.agent_result,
     tests: r.tests_passed !== "" ? `${r.tests_passed}✓ ${r.tests_failed}✗` : "", build: r.build,
     ui: r.ui_pass !== "" ? `${r.ui_pass}✓ ${r.ui_fail}✗` : "",
   })));
   const bySpec = {};
   for (const r of rows) {
-    const s = (bySpec[r.spec] ??= { runs: 0, tokens: 0, usd: 0, minutes: 0 });
-    s.runs++; s.tokens += +r.total_tokens || 0; s.usd += +r.cost_usd || 0; s.minutes += (+r.duration_s || 0) / 60;
+    const s = (bySpec[r.spec] ??= { runs: 0, minutes: 0 });
+    s.runs++;
+    s.minutes += (+r.duration_s || 0) / 60;
+    if (r.total_tokens) s.tokens = (s.tokens ?? 0) + Number(r.total_tokens);
+    if (r.cost_usd) s.usd = (s.usd ?? 0) + Number(r.cost_usd);
   }
-  log("Totals per spec:");
+  log("Totals per spec (reported metrics only):");
   console.table(Object.fromEntries(Object.entries(bySpec).map(([k, s]) =>
-    [k, { runs: s.runs, tokens: s.tokens, usd: s.usd.toFixed(2), minutes: s.minutes.toFixed(1) }])));
+    [k, { runs: s.runs, tokens: s.tokens ?? "n/a", usd: s.usd?.toFixed(2) ?? "n/a", minutes: s.minutes.toFixed(1) }])));
 }
 
 async function main() {
@@ -308,14 +330,27 @@ async function main() {
   const agent = args._[0];
   if (agent === "metrics") return printMetrics();
   if (!AGENTS.includes(agent)) {
-    log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 14).join("\n").replace(/^\/\/ ?/gm, ""));
+    log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 15).join("\n").replace(/^\/\/ ?/gm, ""));
     process.exit(agent ? 1 : 0);
   }
 
   // --- preflight ---
-  if (!sh("claude --version").ok && args.dryRun) log("⚠ Claude Code CLI not found (needed for real runs).");
-  else if (!sh("claude --version").ok) die("Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code");
-  const specDir = args.spec.replace(/\\/g, "/").replace(/\/$/, "");
+  const { runner } = args;
+  if (runner !== "claude" && runner !== "opencode") die("Use --runner claude or --runner opencode.");
+  if (runner === "opencode" && args.budget !== undefined)
+    die("--budget is only supported by Claude Code. OpenCode has no per-run spending limit in this runner.");
+  if (runner === "opencode" && args.model && !/^[\w.@+-]+\/[\w./:@+-]+(?:#[\w.@+-]+)?$/.test(args.model))
+    die("Use an OpenCode model in provider/model or provider/model#variant format.");
+  const cli = sh(`${runner} --version`);
+  const cliReady = cli.ok && (runner !== "opencode" || /^(?:opencode )?v?2\./m.test(cli.out));
+  if (!cliReady) {
+    const message = runner === "claude"
+      ? "Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
+      : "OpenCode v2 CLI is required. Install or upgrade it: https://opencode.ai/docs/";
+    if (!args.dryRun) die(message);
+    log(`⚠ ${message} (needed for real runs).`);
+  }
+  const specDir = path.posix.normalize(args.spec.replace(/\\/g, "/")).replace(/\/$/, "");
   const specId = path.basename(specDir);
   const specFile = `${specDir}/spec.md`;
   if (agent !== "explore" && !fs.existsSync(path.join(ROOT, specFile))) die(`Spec not found: ${specFile}`);
@@ -342,12 +377,18 @@ async function main() {
   const attempt = readMetrics().filter((r) => r.spec === group && r.agent === agent).length + 1;
 
   const usesBrowser = agent === "verifier" || agent === "explore";
-  const mcp = usesBrowser
-    ? { mcpServers: { playwright: { command: "npx", args: ["-y", "@playwright/mcp@0.0.84", "--isolated",
-        "--output-dir", rel(path.join(runDir, "screenshots")), "--viewport-size", "1280,800"] } } }
-    : { mcpServers: {} };
+  const playwrightArgs = usesBrowser
+    ? ["-y", "@playwright/mcp@0.0.84", "--isolated",
+        "--output-dir", rel(path.join(runDir, "screenshots")), "--viewport-size", "1280,800"]
+    : null;
   const mcpConfig = path.join(runDir, "mcp.json");
-  fs.writeFileSync(mcpConfig, JSON.stringify(mcp, null, 2));
+  const config = runner === "opencode"
+    ? openCodeConfig({ agent, specFile, specId, runPath: rel(runDir), playwrightArgs })
+    : null;
+  if (!config) {
+    const mcpServers = playwrightArgs ? { playwright: { command: "npx", args: playwrightArgs } } : {};
+    fs.writeFileSync(mcpConfig, JSON.stringify({ mcpServers }, null, 2));
+  }
 
   const prompt = [
     fs.readFileSync(path.join(ROOT, "agents", `${agent}.md`), "utf8"),
@@ -356,6 +397,9 @@ async function main() {
     `- Run directory (write your report and outputs here): \`${rel(runDir)}/\``,
     usesBrowser ? `- Screenshots are saved by Playwright MCP into \`${rel(runDir)}/screenshots/\`` : "",
     `- Git branch: \`${branch}\``,
+    runner === "opencode" && agent === "verifier"
+      ? "- After each completed UI scenario, save its result in `verification.json` and update `report.md`. Keep the JSON valid and include only scenarios you have actually checked."
+      : "",
     args.feedback
       ? `\n## Feedback from the previous cycle (fix these problems)\n\n${fs.readFileSync(path.resolve(args.feedback), "utf8")}`
       : "",
@@ -363,29 +407,36 @@ async function main() {
   ].filter(Boolean).join("\n");
   fs.writeFileSync(path.join(runDir, "prompt.md"), prompt);
 
-  log(`\n▶ ${agent.toUpperCase()} · spec ${group} · attempt ${attempt} · run ${runId}`);
+  log(`\n▶ ${agent.toUpperCase()} · ${runner} · spec ${group} · attempt ${attempt} · run ${runId}`);
   log(`  Trace: ${rel(runDir)}/transcript.jsonl\n`);
 
   const stopApp = usesBrowser ? await startApp(runDir) : null;
   if (args.dryRun) {
     if (stopApp) stopApp();
-    fs.rmSync(runDir, { recursive: true, force: true });
-    log("✔ Dry run OK: prompt, permissions, MCP config" + (usesBrowser ? " and app start/stop" : "") + " work.\n");
+    fs.rmSync(runDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    log("✔ Dry run OK: prompt and runner config prepared" + (usesBrowser ? "; app started and stopped" : "") + ".\n");
     log(prompt);
     return;
   }
-  const result = await runClaude({
-    prompt, settings: path.join(ROOT, "agents", "settings", `${agent}.json`),
-    mcpConfig, model: args.model, budget: args.budget, runDir,
-  });
-  if (stopApp) stopApp();
-  if (!result) die(`Claude produced no result. See ${rel(runDir)}/transcript.jsonl`);
+  let result;
+  try {
+    result = config
+      ? await runOpenCode({ prompt, config, model: args.model, root: ROOT, runDir, log, summarizeInput })
+      : await runClaude({
+          prompt, settings: path.join(ROOT, "agents", "settings", `${agent}.json`),
+          mcpConfig, model: args.model, budget: args.budget ?? "5", runDir,
+        });
+  } finally {
+    if (stopApp) stopApp();
+  }
+  if (!result) die(`${runner} produced no result. See ${rel(runDir)}/transcript.jsonl`);
   // Drop account/session identifiers before saving: they are not needed as evidence.
   const { session_id, uuid, credential_expires_at, ...publicResult } = result;
-  fs.writeFileSync(path.join(runDir, "claude-result.json"), JSON.stringify(publicResult, null, 2));
+  fs.writeFileSync(path.join(runDir, `${runner}-result.json`), JSON.stringify(publicResult, null, 2));
 
-  const agentResult = (String(result.result ?? "").match(/RESULT:\s*([A-Z_]+(?: \d+)?)/) ?? [])[1]
-    ?? (result.is_error ? `ERROR_${result.subtype}` : "NO_RESULT_LINE");
+  const agentResult = result.is_error
+    ? `ERROR_${result.subtype}`
+    : (String(result.result ?? "").match(/RESULT:\s*([A-Z_]+(?: \d+)?)/) ?? [])[1] ?? "NO_RESULT_LINE";
 
   // --- deterministic checks (the code decides, not the agent) ---
   log("\n• Running checks…");
@@ -458,17 +509,21 @@ async function main() {
 
   // --- metrics ---
   const u = result.usage ?? {};
+  const unreportedTokens = runner === "claude" ? 0 : undefined;
   const row = {
-    run_id: runId, date: new Date().toISOString(), spec: group, agent, attempt,
+    run_id: runId, date: new Date().toISOString(), spec: group, agent, attempt, runner,
     model: Object.keys(result.modelUsage ?? {}).join("+") || args.model || "default",
     duration_s: Math.round((result.duration_ms ?? 0) / 1000), turns: result.num_turns,
-    input_tokens: u.input_tokens ?? 0, output_tokens: u.output_tokens ?? 0,
-    cache_read_tokens: u.cache_read_input_tokens ?? 0, cache_write_tokens: u.cache_creation_input_tokens ?? 0,
-    cost_usd: (result.total_cost_usd ?? 0).toFixed(4), agent_result: agentResult, ...checks,
+    input_tokens: u.input_tokens ?? unreportedTokens, output_tokens: u.output_tokens ?? unreportedTokens,
+    cache_read_tokens: u.cache_read_input_tokens ?? unreportedTokens,
+    cache_write_tokens: u.cache_creation_input_tokens ?? unreportedTokens,
+    reasoning_tokens: result.reasoning_tokens,
+    cost_usd: result.total_cost_usd?.toFixed(4), agent_result: agentResult, ...checks,
   };
-  row.total_tokens = row.input_tokens + row.output_tokens + row.cache_read_tokens + row.cache_write_tokens;
-  if (!fs.existsSync(METRICS)) fs.writeFileSync(METRICS, METRIC_COLUMNS.join(",") + "\n");
-  fs.appendFileSync(METRICS, csvRow(row) + "\n");
+  const tokenCounts = [row.input_tokens, row.output_tokens, row.cache_read_tokens, row.cache_write_tokens];
+  if (runner === "opencode") tokenCounts.push(result.reasoning_tokens);
+  if (tokenCounts.every(Number.isFinite)) row.total_tokens = tokenCounts.reduce((sum, count) => sum + count, 0);
+  appendMetrics(row);
   fs.writeFileSync(path.join(runDir, "metrics.json"), JSON.stringify(row, null, 2));
 
   // --- commit (evidence + changes) ---
@@ -536,12 +591,12 @@ async function main() {
   // --- summary for the human ---
   log("\n──────── SUMMARY ────────");
   log(`Agent result : ${agentResult}`);
-  log(`Duration     : ${(row.duration_s / 60).toFixed(1)} min, ${row.turns} turns`);
-  log(`Tokens / cost: ${row.total_tokens} tokens, $${row.cost_usd}`);
+  log(`Duration     : ${(row.duration_s / 60).toFixed(1)} min, ${row.turns ?? "n/a"} turns`);
+  log(`Tokens / cost: ${row.total_tokens ?? "n/a"} tokens, ${row.cost_usd === undefined ? "n/a" : `$${row.cost_usd}`}`);
   for (const [k, v] of Object.entries(checks)) log(`${k.padEnd(13)}: ${v}`);
   log(`Report       : ${rel(runDir)}/report.md`);
   log("─────────────────────────");
-  log(nextStep(agent, agentResult, checks, specDir));
+  log(nextStep(agent, agentResult, checks, specDir, runner));
 }
 
 function checkVerification(
@@ -691,9 +746,12 @@ function checkVerification(
   return checks;
 }
 
-function nextStep(agent, res, checks, specDir) {
-  const s = specDir === "specs/001-goals" ? "" : ` --spec ${specDir}`;
-  if (agent === "explore") return "Next: read the report and screenshots. Then: git checkout -b feature/spec-001-goals && node scripts/agent.mjs tester";
+function nextStep(agent, res, checks, specDir, runner) {
+  const s = (specDir === "specs/001-goals" ? "" : ` --spec ${specDir}`) +
+    (runner === "claude" ? "" : ` --runner ${runner}`);
+  if (agent === "explore") return res === "EXPLORED"
+    ? `Next: read the report and screenshots. On the feature branch: node scripts/agent.mjs tester${s}`
+    : "Exploration is incomplete. See transcript.jsonl and any screenshots in the run directory.";
   if (agent === "tester") {
     if (checks.agent_execution !== "ok") {
       return "Tester execution failed. Read the run outputs before continuing.";
@@ -732,7 +790,7 @@ function nextStep(agent, res, checks, specDir) {
   }
   if (agent === "verifier") {
     return checks.verification !== "ok"
-      ? "Verification failed or incomplete. Next (human): read checks.json, report.md and screenshots before continuing."
+      ? "Verification failed or incomplete. See checks.json, transcript.jsonl, and any report or screenshots in the run directory."
       : "All checks passed. Next (human): review evidence, push the branch and open a PR (see docs/INSTRUCTIONS.md).";}
   return "Baseline done. Compare its metrics with the multi-agent runs: node scripts/agent.mjs metrics";
 }

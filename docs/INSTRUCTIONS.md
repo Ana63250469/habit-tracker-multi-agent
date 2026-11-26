@@ -16,11 +16,18 @@ Every run saves its evidence in `runs/` and appends a metrics row to `runs/metri
 ## 0. One-time setup (≈ 10 min)
 
 1. **Node.js 20+** and **Google Chrome**. Playwright MCP uses Chrome by default.
-2. **Claude Code CLI:**
-   ```bash
-   npm install -g @anthropic-ai/claude-code
-   claude            # run once and log in, then quit with /exit
-   ```
+2. **Choose an agent runner:**
+   - **[OpenCode v2](https://opencode.ai/docs/):** Check `opencode --version`.
+     Open `opencode`, connect a provider with `/connect` and select a model.
+     Add `--runner opencode` to each agent command. Optionally select a model
+     for one run with `--model provider/model`. OpenCode uses fresh sessions and
+     per-role permissions. `--budget` is Claude-only; OpenCode does not enforce
+     a spending limit for the run.
+   - **Claude Code** (the default if `--runner` is omitted):
+     ```bash
+     npm install -g @anthropic-ai/claude-code
+     claude          # run once and log in, then quit with /exit
+     ```
 3. **App:**
    ```bash
    cd app
@@ -28,11 +35,15 @@ Every run saves its evidence in `runs/` and appends a metrics row to `runs/metri
    cp .env.example .env          # only if .env does not exist yet
    cd ..
    ```
+   On a fresh install, generate the Prisma Client before running tests:
+   `npm --prefix app run db:generate --workspace=server`.
 4. **Check.** Everything must be green or say "OK":
    ```bash
-   npm --prefix app/server test                         # 2 harness tests: passed
-   node scripts/agent.mjs explore --dry-run             # "Dry run OK ... app start/stop work"
+   npm --prefix app/server test
+   node scripts/agent.mjs explore --dry-run --runner opencode
    ```
+   Omit `--runner opencode` if using Claude Code. A dry run starts and stops the
+   app, but does not connect to the model or launch a browser.
 
 > **Do not run** your own `npm run dev` while agents are running. For the verifier, the runner
 > starts the app itself with a separate test database, then stops it.
@@ -46,6 +57,29 @@ node scripts/agent.mjs explore
 ```
 A browser opens and the agent clicks through the app by itself. This also checks that Playwright MCP works.
 The result is `runs/explore/<run>/report.md` with screenshots. You can use it for the AS-IS part of the report.
+
+### Start a new cycle with OpenCode
+
+SPEC-001 is already implemented on `main`. If your remote has the prepared
+`origin/feature/spec-002-progress` branch, switch to it (or use
+`git switch feature/spec-002-progress` if you already have it locally):
+
+```bash
+git switch --track origin/feature/spec-002-progress
+node scripts/agent.mjs tester --runner opencode --spec specs/002-progress
+node scripts/agent.mjs implementer --runner opencode --spec specs/002-progress
+node scripts/agent.mjs verifier --runner opencode --spec specs/002-progress
+node scripts/agent.mjs metrics
+```
+
+The runner changes must be available on the feature branch before running
+these commands there. Review `runs/002-progress/<run>/report.md` after each
+step. If the verifier finds a problem, repeat the implementer command with
+`--feedback runs/002-progress/<verifier-run>/report.md`, then run the verifier again.
+If OpenCode stops without a final response, the runner tries to continue the
+same session up to twice. The verifier saves results after each scenario.
+An incomplete `verification.json` is still a failed verification; see
+`checks.json` and the run transcript for details.
 
 ---
 
@@ -130,11 +164,16 @@ The metrics table shows both variants side by side: `agent = baseline` vs. `test
 | Column | Meaning |
 | --- | --- |
 | `agent`, `attempt` | which agent, and which attempt for this spec |
+| `runner` | `claude` or `opencode` |
 | `duration_s`, `turns` | how long the agent ran and how many steps it took |
 | `input/output/cache_*_tokens`, `total_tokens`, `cost_usd` | token usage and cost |
 | `agent_result` | what the agent reported (e.g. `TESTS_WRITTEN`, `FAILURES 2`) |
 | `tests_passed/failed`, `build`, `protected_tests` | checks run by the **runner** (code, not the agent) |
 | `ui_pass/ui_fail` | verifier results |
+
+Missing OpenCode metrics are recorded as unavailable. OpenCode turns count
+completed model steps, the token total includes reported reasoning tokens,
+and the cost shown is the amount reported by OpenCode.
 
 From these columns you get:
 - the number of **spec iterations** (tester runs);
@@ -149,5 +188,5 @@ From these columns you get:
 | `Ports 5173/3000 are in use` | Stop your own `npm run dev`. |
 | `EPERM` during `prisma generate` | On Windows, stop all Node processes running the app. |
 | The verifier does not open a browser | Install Chrome or run `npx playwright install chrome`. |
-| The agent runs out of budget | Raise it, e.g. `--budget 15`. |
+| Claude Code runs out of budget | Raise it, e.g. `--budget 15`. |
 | `You are on 'main'` | `git checkout -b feature/spec-001-goals` |

@@ -10,6 +10,18 @@
 
 In short:
 
+Use `--runner opencode` to run the agents with [OpenCode v2](https://opencode.ai/docs/)
+and its configured model. Without this option, the runner uses Claude Code.
+
+```bash
+node scripts/agent.mjs explore --runner opencode --dry-run
+node scripts/agent.mjs explore --runner opencode
+```
+
+The example below is the original Claude Code workflow for SPEC-001, which is
+already implemented on `main`. For a fresh cycle, see SPEC-002 in the [run
+instructions](docs/INSTRUCTIONS.md#start-a-new-cycle-with-opencode).
+
 ```bash
 node scripts/agent.mjs explore                 # agent explores the existing app
 git checkout -b feature/spec-001-goals

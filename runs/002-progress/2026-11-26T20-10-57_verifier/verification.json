@@ -1,0 +1,23 @@
+[
+  {
+    "id": "UI1",
+    "status": "PASS",
+    "expected": "Progress date defaults to D (2026-11-26). Run and Read show `No goal`; Old is hidden.",
+    "observed": "Progress date text input (data-testid=goal-progress-date) has value 2026-11-26. Run shows `No goal` with `Set goal`. Read shows `No goal` with `Set goal`. Archived habit `Old` is not shown. Page heading `Goals`.",
+    "screenshot": "UI1.png"
+  },
+  {
+    "id": "UI2",
+    "status": "PASS",
+    "expected": "Set Run to Weekly, target 3: `0 of 3 completed this week`, correct Monday–Sunday dates, progress value 0, no `Goal reached`.",
+    "observed": "Run now shows goal `3 times per week`, `0 of 3 completed this week`, period `2026-11-23 – 2026-11-29` (Mon–Sun for D=2026-11-26), progressbar `Progress for Run` role=progressbar min=0 max=100 value=0, no `Goal reached`. Testids goal-progress-*, goal-progress-period-*, goal-progress-bar-* present. Existing Edit/Remove controls preserved.",
+    "screenshot": "UI2.png"
+  },
+  {
+    "id": "UI3",
+    "status": "PASS",
+    "expected": "Open Today at D, add two Run entries, return to Goals: without manual reload Run shows `2 of 3 completed this week`; progress value 66.",
+    "observed": "Added two Run entries at 2026-11-26 (9:14 PM, 9:15 PM) on Today page; client-side navigation to Goals shows `2 of 3 completed this week`, period `2026-11-23 – 2026-11-29`, progressbar `Progress for Run` value=66 min=0 max=100; no manual reload.",
+    "screenshot": "UI3.png"
+  }
+]
